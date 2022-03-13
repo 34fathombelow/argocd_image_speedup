@@ -31,7 +31,7 @@ jobs:
 
       # get image tag
       - run: echo ::set-output name=tag::$(cat ./VERSION)-${GITHUB_SHA::8}
-        working-directory: .src/argocd_image_speedup
+        working-directory: ./src/argocd_image_speedup
         id: image
 
       - name: Login to docker container registry
@@ -55,7 +55,7 @@ jobs:
       - name: Build cache for argocd-ui stage
         uses: docker/build-push-action@v2
         with:
-          context: src/argocd_image_speedup
+          context: ./src/argocd_image_speedup
           platforms: linux/amd64,linux/arm64
           # Target for Dockerfile to build
           target: argocd-ui
@@ -90,7 +90,7 @@ jobs:
             --cache-from "type=local,src=/tmp/.buildx-cache" \
             -t ghcr.io/argoproj/argocd:${{ steps.image.outputs.tag }} \
             -t quay.io/argoproj/argocd:latest .
-        working-directory: .src/argocd_image_speedup
+        working-directory: ./src/argocd_image_speedup
         if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'test-arm-image')
 
         # Temp fix

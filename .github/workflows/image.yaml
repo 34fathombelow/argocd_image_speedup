@@ -30,7 +30,7 @@ jobs:
 
       # get image tag
       - run: echo ::set-output name=tag::$(cat ./VERSION)-${GITHUB_SHA::8}
-        working-directory: .src/argocd_image_speedup
+        working-directory: ./src/argocd_image_speedup
         id: image
 
       - name: Login to docker container registry
@@ -54,7 +54,7 @@ jobs:
       - name: Build cache for argocd-ui stage
         uses: docker/build-push-action@v2
         with:
-          context: src/argocd_image_speedup
+          context: ./src/argocd_image_speedup
           platforms: linux/amd64,linux/arm64
           # Target for Dockerfile to build
           target: argocd-ui
@@ -72,7 +72,7 @@ jobs:
       - name: Ensure docker builds for pull request
         uses: docker/build-push-action@v2
         with:
-          context: src/argocd_image_speedup
+          context: ./src/argocd_image_speedup
           platforms: linux/amd64
           push: false
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -81,7 +81,7 @@ jobs:
       - name: Build and push the latest image
         uses: docker/build-push-action@v2
         with:
-          context: src/argocd_image_speedup
+          context: ./src/argocd_image_speedup
           platforms: linux/amd64,linux/arm64
           pull: true
           # Change to push: true for pull request
@@ -95,7 +95,7 @@ jobs:
       - name: test-arm-image
         uses: docker/build-push-action@v2
         with:
-          context: src/argocd_image_speedup
+          context: ./src/argocd_image_speedup
           platforms: linux/amd64,linux/arm64
           push: false
           cache-from: type=local,src=/tmp/.buildx-cache
