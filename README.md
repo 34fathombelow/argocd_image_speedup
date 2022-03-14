@@ -7,12 +7,12 @@ Images being built on arm64 are taking an excessive amount of time due to the em
 ## Solution steps
 ### Changes were made to image.yaml
 1. Setup a cache for argo-ui docker layer
-2. Build the cache during push events, cache **cannot** be built during pull request for secuity purposes.  More on that can be found at 
+2. Build the cache during push/merge events, cache **cannot** be built during pull request for secuity purposes.  More on that can be found at 
 [Restrictions for accessing a cache](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache)
-3. Seperate existing build proccess into 3 steps to provide more flexibilty
-- Ensure docker builds for pull request only on `linux/amd64` does not push to registry
-- Build and push the latest image for push events on `linux/amd64,linux/arm64` pushes to registry
-- Test-arm-image used with `test-arm-image` label to build on `linux/amd64,linux/arm64` does not push to registry
+3. Seperate build proccess use cache differently.
+- Pull request events will use `linux/amd64` and use cache if it has been built. 
+- Push/Merge events on `linux/amd64,linux/arm64` pushes to registry uses cache and rebuilds cache if needed
+- Test-arm-image label events will build on `linux/amd64,linux/arm64` and use cache if it has been built. 
 4. Clean up build cache if new cache was built
 
 ## Results
