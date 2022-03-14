@@ -23,6 +23,7 @@ Images being built on arm64 are taking an excessive amount of time due to the em
 | Image | 4 | Push/Merge | yes | 1hr 18m | 38m 44s | 36min 57s | amd64/arm64 | cache built and saved
 | Image | 5 | PR | no | 6min 5s | n/a | 4min 39s | amd64 | cache used
 | Image | 6 | Push/Merge| no | 34min 39s | n/a | 32min 7s | amd64/arm64 | cache used
+| Image | 7 | Push/Merge| no | 40m 34s | n/a | 38min 2s | amd64/arm64 | cache used
 
 ## When will cache be rebuilt?
 1. When base image changes
