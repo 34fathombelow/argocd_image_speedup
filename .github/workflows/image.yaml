@@ -61,8 +61,6 @@ jobs:
           push: true
           tags: |
             douhunt/test:latest
-            #  quay.io/argoproj/argocd:latest
-            #  ghcr.io/argoproj/argocd:${{ steps.image.outputs.tag }}
         if: github.event_name == 'push'
 
       - name: test-arm-image
