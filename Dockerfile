@@ -28,7 +28,7 @@ ADD hack/install.sh .
 ADD hack/installers installers
 ADD hack/tool-versions.sh .
 
-ENV TARGETPLATFORM
+ARG TARGETPLATFORM
 RUN ./install.sh helm2-linux
 RUN ./install.sh helm-linux
 RUN ./install.sh kustomize-linux
