@@ -57,11 +57,7 @@ jobs:
         if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'test-arm-image')
 
       - run: |
-          IMAGE_PLATFORMS=linux/amd64
-          if [[ "${{ github.event_name }}" == "push" || "${{ contains(github.event.pull_request.labels.*.name, 'test-arm-image') }}" == "true" ]]
-          then
-            IMAGE_PLATFORMS=linux/amd64,linux/arm64
-          fi
+          IMAGE_PLATFORMS=linux/amd64,linux/arm64
           echo "Building image for platforms: $IMAGE_PLATFORMS"
           docker buildx build --platform $IMAGE_PLATFORMS --push="${{ github.event_name == 'push' }}" \
             --cache-from "type=local,src=/tmp/.buildx-cache" \
