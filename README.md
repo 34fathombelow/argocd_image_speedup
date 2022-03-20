@@ -4,62 +4,51 @@ Disclaimer: Do not use any of these files in production!!! All files in this rep
 ## The purpose for this repository is testing a solution to speedup the build proccess of images for Argo CD.
 Images being built on arm64 are taking an excessive amount of time due to the emulation of the architecture they are being built on.  In particular the argocd-ui stage which performs `yarn install --network-timeout 200000` & `RUN HOST_ARCH='amd64' NODE_ENV='production' NODE_ONLINE_ENV='online' NODE_OPTIONS=--max_old_space_size=8192 yarn build`
 
-## Solution steps
-### Changes were made to image.yaml
-1. Setup a cache for argo-ui docker layer
-2. Build the cache during push/merge events, cache **cannot** be built during pull request for secuity purposes.  More on that can be found at 
-[Restrictions for accessing a cache](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#restrictions-for-accessing-a-cache)
-3. Seperate build proccess use cache differently.
-- Pull request events will use `linux/amd64` and use cache if it has been built. 
-- Push/Merge events on `linux/amd64,linux/arm64` pushes to registry uses cache and rebuilds cache if needed
-- Test-arm-image label events will build on `linux/amd64,linux/arm64` and use cache if it has been built. 
-4. Clean up build cache if new cache was built
+### tl;dr
 
-## Results
-| Workflow | Image # | Event | Cache Built | Total Time | Cache Build Time | Image Time | ARCH | Cache |
-| ---  |--- | --- | --- | --- | --- | --- | --- | -- |
-| Image | 2 | PR | no | 6min 48s | n/a | 6min 38s | amd64 | no cache |
-| Image | 3 | PR/Label | yes | 1hr 18m | 39m 49s | 36min 57s | amd64/arm64 | cache cannot be built during PR
-| Image | 4 | Push/Merge | yes | 1hr 18m | 38m 44s | 36min 57s | amd64/arm64 | cache built and saved
-| Image | 5 | PR | no | 6min 5s | n/a | 4min 39s | amd64 | cache used
-| Image | 6 | Push/Merge| no | 34min 39s | n/a | 32min 7s | amd64/arm64 | cache used
-| Image | 7 | Push/Merge| no | 40m 34s | n/a | 38min 2s | amd64/arm64 | cache used
+Adding cache was helpful in speeding up image build times by 2x. These changes improve build times by a total of **8x** while maintaining backwards compatability. The flowchart below shows how the Dockerfile is processed using cross-compilation. Orange nodes are `x86_64` and opaque orange nodes are `arm64`  Using hardware emulation is to slow for the `argocd-ui` and `argocd-build` stages.
 
-## When will cache be rebuilt?
-1. When base image changes
-2. `ui/package.json` or `ui/yarn.lock` files are modified
-3. when any files are changed in `ui/`
+### Dockerfile improvements
 
-i.e. #3 above changes. Any instructions from Line 41 and below will be ran.  Any Instructions above Line 41 will still be used in the cache.
+We can leverage the build host architecture ($BUILDPLATFORM) to build the `argocd-ui` stage since it only produces artifacts which are platform independent, saving approx. 38 mins in build time.
 
-```DOCKERFILE
-FROM docker.io/library/node:12.18.4 as argocd-ui
+The `argocd-build` stage can also be built on the build host architecture (\$BUILDPLATFORM) to cross compile the Argo binaries by passing in `ARG TARGETOS TARGETARCH`. These are the parameters used in `buildx --platform linux/amd64,linux/arm64` . Setting `RUN GOOS=$TARGETOS GOARCH=$TARGETARCH make argocd-all` will instruct buildx to compile architectures listed with `--platforms` .  The binaries are then passed into the Final Image for each architecture.  With these changes build times have been 10-12 mins on github runners. Ref: https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
 
-WORKDIR /src
-ADD ["ui/package.json", "ui/yarn.lock", "./"]
+```mermaid
+flowchart TB
+id1([builder]) & id6([builder])
+id1([builder]) --> id2([argo-base]) --> id3([argo-ui])--> id4([argocd-build])
+id4([argocd-build]) --> id5([x86_64 Final Image]) & id8([ arm64 Final Image])
+id6([builder]) --> id7([argo-base]) ---->  id8([arm64 Final Image])
+id5 & id8 --> id9([Container Registry])
 
-RUN yarn install --network-timeout 200000
+style id9 fill:#5C74C6,stroke:#333,stroke-width:2px,color:#ffffff
+classDef x86 fill:#EF7B4D,stroke:#EF7B4D,stroke-width:2px,color:#ffffff
+classDef arm64 fill:#FCE5DB,stroke:#EF7B4D,stroke-width:2px,color:#EF7B4D
+class id1,id2,id3,id4,id5 x86
+class id6,id7,id8 arm64
 
-ADD ["ui/", "."]
-
-ARG ARGO_VERSION=latest
-ENV ARGO_VERSION=$ARGO_VERSION
-RUN HOST_ARCH='amd64' NODE_ENV='production' NODE_ONLINE_ENV='online' NODE_OPTIONS=--max_old_space_size=8192 yarn build
 ```
 
-## Steps to replicate on local dev environment
-Be sure to have buildx running for multi architecture support
-https://docs.docker.com/desktop/multi-arch/
+### Test Performed
 
-### Build cache for argocd-ui stage
-```
-docker buildx build --platform linux/arm64,linux/amd64 --target=argocd-ui --push=false --cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max .
-```
-### Build argocd-ui stage from cache
-```
-docker buildx build --platform linux/arm64,linux/amd64 --target=argocd-ui --push=false --cache-from=type=local,src=/tmp/.buildx-cache-new .
-```
-### Build comlete DOCKERFILE
-```
-docker buildx build --platform linux/arm64,linux/amd64 --push=false --cache-from=type=local,src=/tmp/.buildx-cache-new . 
+- Built Images with github runners
+- Built Images locally
+- Pushed to a registry
+- Verified binaries built properly inside container (podman & docker run ...)
+- Ran on native arm64 cluster (Raspberry Pi Cluster)
+- Ran on x86_64 cluster (Kind and Minikube)
+
+```yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+images:
+- name: quay.io/argoproj/argocd
+  newName: ghcr.io/34fathombelow/argocd_image_speedup
+  newTag: latest
+
+namespace: argo-cd-test
+resources:
+- https://raw.githubusercontent.com/argoproj/argo-cd/master/manifests/install.yaml
 ```
