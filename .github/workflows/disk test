@@ -14,7 +14,7 @@ env:
   GOLANG_VERSION: '1.17.6'
 
 jobs:
-  publish:
+  disk:
     runs-on: ubuntu-latest
     steps:
       
