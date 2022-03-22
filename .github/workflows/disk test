@@ -1,0 +1,41 @@
+
+name: Disk Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [ labeled, unlabeled, opened, synchronize, reopened ]
+
+env:
+  GOLANG_VERSION: '1.17.6'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      
+      - name: Checkout code
+        uses: actions/checkout@master
+        with:
+          path: src/argocd_image_speedup
+     
+      - uses: docker/setup-qemu-action@v1
+      - uses: docker/setup-buildx-action@v1
+
+      - name: Setup cache for argocd-ui docker layer
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-single-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-single-buildx
+      - name: Check Disk space
+        run: |
+          df -h
+
+
+      
